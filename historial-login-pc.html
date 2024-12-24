@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head> 
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Historial de Inicio de Sesión</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #2c3e50;
+    }
+    header {
+      background-color: #15a086;
+      color: white;
+      padding: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    header .print-btn {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+    }
+    .container {
+      padding: 20px;
+    }
+    .search-bar {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+    }
+    .search-bar input {
+      padding: 10px;
+      font-size: 16px;
+      width: 100%;
+      max-width: 300px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    .search-bar button {
+      padding: 10px 15px;
+      background-color: #15a086;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .search-bar button:hover {
+      background-color: #16e086;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background: white;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    th, td {
+      padding: 12px;
+      border: 1px solid #ddd;
+      text-align: left;
+    }
+    th {
+      background-color: #15a086;
+      color: white;
+    }
+    tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+    tr:hover {
+      background-color: #f1f1f1;
+    }
+    @media print {
+      .search-bar, .print-btn {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Historial de Inicios de Sesión</h1>
+    <button class="print-btn" onclick="window.print()" title="Imprimir"><i class="fas fa-print"></i></button>
+  </header>
+  <div class="container">
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="Buscar por nombre o fecha (DD/MM/AAAA)">
+      <button id="searchButton">Buscar</button>
+    </div>
+    <table id="historyTable">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>ID Usuario</th>
+          <th>Fecha y Hora</th>
+        </tr>
+      </thead>
+      <tbody id="historyBody">
+        <!-- Los datos se agregarán dinámicamente -->
+      </tbody>
+    </table>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
+    import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDLi-egzQlgbKW8XV_qIhU6313Gd8gocCg",
+      authDomain: "inventario-35d6b.firebaseapp.com",
+      projectId: "inventario-35d6b",
+      storageBucket: "inventario-35d6b.appspot.com",
+      messagingSenderId: "266100399659",
+      appId: "1:266100399659:web:92358d28cbd803c8a7d46e"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const historyRef = collection(db, "loginHistory");
+
+    // Función para cargar el historial completo
+    async function loadHistory() {
+      const historyBody = document.getElementById("historyBody");
+      historyBody.innerHTML = "";
+      try {
+        const q = query(historyRef, orderBy("loginTime", "desc"));
+        const snapshot = await getDocs(q);
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${data.userName || "Sin nombre"}</td>
+            <td>${data.userId}</td>
+            <td>${new Date(data.loginTime).toLocaleString()}</td>
+          `;
+          historyBody.appendChild(row);
+        });
+      } catch (error) {
+        console.error("Error al cargar el historial:", error);
+      }
+    }
+
+    // Función para filtrar por nombre o fecha
+    async function filterHistory() {
+      const searchValue = document.getElementById("searchInput").value.trim().toLowerCase();
+      const historyBody = document.getElementById("historyBody");
+      historyBody.innerHTML = "";
+
+      if (!searchValue) {
+        alert("Por favor, ingresa un nombre o fecha para buscar.");
+        return;
+      }
+
+      try {
+        const snapshot = await getDocs(historyRef);
+        const filteredData = snapshot.docs.filter((doc) => {
+          const data = doc.data();
+          const userNameMatch = data.userName?.toLowerCase().includes(searchValue);
+          const dateMatch = new Date(data.loginTime).toLocaleDateString("es-ES").includes(searchValue);
+          return userNameMatch || dateMatch;
+        });
+
+        if (filteredData.length === 0) {
+          historyBody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: red;">No se encontraron resultados</td></tr>`;
+          return;
+        }
+
+        filteredData.forEach((doc) => {
+          const data = doc.data();
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${data.userName || "Sin nombre"}</td>
+            <td>${data.userId}</td>
+            <td>${new Date(data.loginTime).toLocaleString()}</td>
+          `;
+          historyBody.appendChild(row);
+        });
+      } catch (error) {
+        console.error("Error al filtrar:", error);
+      }
+    }
+
+    // Evento para buscar
+    document.getElementById("searchButton").addEventListener("click", filterHistory);
+
+    // Cargar el historial inicialmente
+    loadHistory();
+  </script>
+</body>
+</html>
